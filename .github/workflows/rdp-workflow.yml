@@ -1,4 +1,4 @@
-name: Simple RDP with Files
+name: RDP with Python Tool
 on:
   workflow_dispatch:
 
@@ -32,10 +32,13 @@ jobs:
           Write-Host "RDP user TOOLBOXLAP تم إنشاؤه"
 
       # 4) نسخ ملفات script.py و users.txt إلى سطح المكتب داخل RDP
-      - name: Copy files to RDP Desktop
+      - name: Copy Python tool and users.txt to RDP
         shell: pwsh
         run: |
-          $src = $env:GITHUB_WORKSPACE   # جذر الريبو
+          # إذا الملفات في جذر الريبو مباشرة
+          $src = $env:GITHUB_WORKSPACE
+          # إذا الملفات في مجلد داخلي بنفس اسم الريبو، استخدم:
+          # $src = Join-Path $env:GITHUB_WORKSPACE 'rdp-files'
           $dest = 'C:\Users\TOOLBOXLAP\Desktop\rdp-files'
           New-Item -Path $dest -ItemType Directory -Force | Out-Null
           Copy-Item -Path "$src\script.py" -Destination $dest -Force
