@@ -1,9 +1,9 @@
-name: RDP Runner with Python and TXT
+name: Simple RDP with Files
 on:
   workflow_dispatch:
 
 jobs:
-  secure-rdp:
+  rdp-job:
     runs-on: windows-latest
     timeout-minutes: 360
     steps:
@@ -12,70 +12,42 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2) تفعيل RDP على الويندوز وفتح المنفذ 3389
+      # 2) تفعيل RDP وفتح المنفذ 3389
       - name: Enable RDP
         shell: pwsh
         run: |
           Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0 -Force
           netsh advfirewall firewall add rule name="RDP-Allow-3389" dir=in action=allow protocol=TCP localport=3389
 
-      # 3) إنشاء مستخدم TOOLBOXLAP مع كلمة سر من Secrets
-      - name: Create RDP user
+      # 3) إنشاء مستخدم TOOLBOXLAP بكلمة سر بسيطة
+      - name: Create RDP user TOOLBOXLAP
         shell: pwsh
-        env:
-          RDP_PASS: ${{ secrets.RDP_PASS }}
         run: |
-          $pw = ConvertTo-SecureString $env:RDP_PASS -AsPlainText -Force
+          $password = "admin@123"
+          $securePass = ConvertTo-SecureString $password -AsPlainText -Force
           if (-not (Get-LocalUser -Name "TOOLBOXLAP" -ErrorAction SilentlyContinue)) {
-            New-LocalUser -Name "TOOLBOXLAP" -Password $pw -AccountNeverExpires -PasswordNeverExpires
+              New-LocalUser -Name "TOOLBOXLAP" -Password $securePass -AccountNeverExpires -PasswordNeverExpires
           }
           Add-LocalGroupMember -Group "Remote Desktop Users" -Member "TOOLBOXLAP"
+          Write-Host "RDP user TOOLBOXLAP تم إنشاؤه"
 
-      # 4) تثبيت Tailscale
-      - name: Install Tailscale
-        shell: pwsh
-        run: |
-          $msi = "$env:TEMP\tailscale.msi"
-          Invoke-WebRequest -Uri "https://pkgs.tailscale.com/stable/tailscale-setup-latest-amd64.msi" -OutFile $msi
-          Start-Process msiexec.exe -ArgumentList "/i","`"$msi`"","/quiet","/norestart" -Wait
-          Remove-Item $msi -Force
-
-      # 5) تشغيل Tailscale مع auth key
-      - name: Start Tailscale
-        shell: pwsh
-        env:
-          TSKEY: ${{ secrets.TAILSCALE_AUTH_KEY }}
-        run: |
-          & "$env:ProgramFiles\Tailscale\tailscale.exe" up --authkey=$env:TSKEY --hostname=gha-$env:GITHUB_RUN_ID
-          $ip = $null
-          for ($i=0;$i -lt 20 -and -not $ip;$i++) {
-            Start-Sleep -Seconds 3
-            $ip = & "$env:ProgramFiles\Tailscale\tailscale.exe" ip -4
-          }
-          if (-not $ip) { Write-Error "Tailscale IP not found"; exit 1 }
-          echo "TAILSCALE_IP=$ip" >> $env:GITHUB_ENV
-
-      # 6) نسخ ملفات البايثون وTXT إلى سطح المكتب داخل RDP
+      # 4) نسخ ملفات `script.py` و `users.txt` إلى سطح المكتب داخل RDP
       - name: Copy files to RDP Desktop
         shell: pwsh
         run: |
-          $src = Join-Path $env:GITHUB_WORKSPACE 'rdp-files'
+          $src = Join-Path $env:GITHUB_WORKSPACE ''
           $dest = 'C:\Users\TOOLBOXLAP\Desktop\rdp-files'
           New-Item -Path $dest -ItemType Directory -Force | Out-Null
-          Copy-Item -Path "$src\*" -Destination $dest -Recurse -Force
+          Copy-Item -Path "$src\script.py" -Destination $dest -Force
+          Copy-Item -Path "$src\users.txt" -Destination $dest -Force
+          Write-Host "Files copied to $dest"
 
-      # 7) تشغيل سكربت البايثون داخل RDP
-      - name: Run Python script
-        shell: pwsh
-        run: |
-          Start-Process -FilePath "python" -ArgumentList "C:\Users\TOOLBOXLAP\Desktop\rdp-files\script.py" -WindowStyle Hidden
-
-      # 8) طباعة معلومات RDP للاتصال
-      - name: Show connection info
+      # 5) إظهار معلومات RDP للاتصال
+      - name: Show RDP info
         shell: pwsh
         run: |
           Write-Host "==== RDP ACCESS ===="
-          Write-Host "Tailscale IP: $env:TAILSCALE_IP"
           Write-Host "Username: TOOLBOXLAP"
-          Write-Host "Password: (value from RDP_PASS secret)"
+          Write-Host "Password: admin@123"
+          Write-Host "Connect using RDP to this runner's IP"
           while ($true) { Start-Sleep -Seconds 300 }
