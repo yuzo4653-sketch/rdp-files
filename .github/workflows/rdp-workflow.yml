@@ -19,7 +19,7 @@ jobs:
           Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0 -Force
           netsh advfirewall firewall add rule name="RDP-Allow-3389" dir=in action=allow protocol=TCP localport=3389
 
-      # 3) إنشاء مستخدم TOOLBOXLAP بكلمة سر بسيطة
+      # 3) إنشاء مستخدم TOOLBOXLAP بكلمة سر ثابتة
       - name: Create RDP user TOOLBOXLAP
         shell: pwsh
         run: |
@@ -31,11 +31,11 @@ jobs:
           Add-LocalGroupMember -Group "Remote Desktop Users" -Member "TOOLBOXLAP"
           Write-Host "RDP user TOOLBOXLAP تم إنشاؤه"
 
-      # 4) نسخ ملفات `script.py` و `users.txt` إلى سطح المكتب داخل RDP
+      # 4) نسخ ملفات script.py و users.txt إلى سطح المكتب داخل RDP
       - name: Copy files to RDP Desktop
         shell: pwsh
         run: |
-          $src = Join-Path $env:GITHUB_WORKSPACE ''
+          $src = $env:GITHUB_WORKSPACE   # جذر الريبو
           $dest = 'C:\Users\TOOLBOXLAP\Desktop\rdp-files'
           New-Item -Path $dest -ItemType Directory -Force | Out-Null
           Copy-Item -Path "$src\script.py" -Destination $dest -Force
